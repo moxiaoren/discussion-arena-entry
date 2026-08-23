@@ -108,7 +108,8 @@
       window._retryTimer=setInterval(tryOnce,15000);
       msg.textContent='服务器上线后将自动连接…';
   }
-  function fmt(s){ try{ if(!s)return ''; const d=new Date(s); if(isNaN(d))return ''; return d.toLocaleString('zh-CN',{hour12:false}); }catch(e){return '';}}
+}
+function fmt(s){ try{ if(!s)return ''; const d=new Date(s); if(isNaN(d))return ''; return d.toLocaleString('zh-CN',{hour12:false}); }catch(e){return '';}}
   boot();
 </script>
 </body>
