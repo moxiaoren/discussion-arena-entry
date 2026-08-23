@@ -1,2 +1,1 @@
-https://demo-verify.trycloudflare.com
-2026-08-23T07:00:00.000Z
+offline
