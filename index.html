@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f2937">
+<title>讨论间</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{color-scheme:light dark}
+  body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+       min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       background:linear-gradient(160deg,#111827,#1f2937);color:#f3f4f6;padding:24px;text-align:center}
+  .card{max-width:380px;width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+        border-radius:20px;padding:32px 24px;backdrop-filter:blur(8px)}
+  .logo{width:72px;height:72px;margin:0 auto 16px;display:block;border-radius:18px}
+  h1{font-size:20px;margin-bottom:6px}
+  .sub{font-size:13px;color:#9ca3af;margin-bottom:22px}
+  .status{min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.2);
+           border-top-color:#34d399;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #msg{font-size:14px;color:#d1d5db}
+  #urlbox{font-size:13px;color:#9ca3af;word-break:break-all;margin-top:6px}
+  #err{margin-top:14px}
+  .btn{display:inline-block;background:#10b981;color:#fff;border:none;border-radius:10px;
+       padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600}
+  .btn:active{transform:scale(.97)}
+  .meta{margin-top:20px;font-size:12px;color:#6b7280}
+  .hint{margin-top:14px;font-size:12px;color:#6b7280;line-height:1.6}
+  .hidden{display:none!important}
+  a{color:#34d399}
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="icon.svg" alt="logo">
+    <h1>讨论间</h1>
+    <div class="sub">双人异地论证点评 · 自动连接</div>
+    <div class="status" id="stt">
+      <div class="spinner" id="sp"></div>
+      <div id="msg">正在连接讨论间…</div>
+      <div id="urlbox"></div>
+    </div>
+    <div id="err" class="hidden">
+      <div id="emsg" style="color:#fca5a5;font-size:14px">讨论间暂未上线</div>
+      <a id="eback" href="#" style="display:none;font-size:13px;margin-top:6px"></a>
+      <div style="margin-top:14px"><button class="btn" onclick="boot()">重试</button></div>
+    </div>
+    <div class="meta" id="meta"></div>
+    <div class="hint">💡 点浏览器菜单「添加到主屏幕」，下次像 App 一样打开即可。</div>
+  </div>
+<script>
+  const ADDR_FILE = 'latest.txt';
+  const KEY = 'ta_last';
+  let last = null;
+  try{ last = JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+
+  async function boot(){
+    const sp=document.getElementById('sp'),msg=document.getElementById('msg'),
+          ub=document.getElementById('urlbox'),err=document.getElementById('err'),
+          stt=document.getElementById('stt'),meta=document.getElementById('meta');
+    stt.classList.remove('hidden'); err.classList.add('hidden');
+    sp.classList.remove('hidden'); msg.textContent='正在连接讨论间…'; ub.textContent='';
+    const ts=Date.now();
+    try{
+      const r=await fetch(ADDR_FILE+'?v='+ts,{cache:'no-store'});
+      if(!r.ok) throw new Error('addr '+r.status);
+      const txt=(await r.text()).trim();
+      if(!txt) throw new Error('empty');
+      const lines=txt.split(/\r?\n/);
+      const addr=(lines[0]||'').trim();
+      const tsTxt=(lines[1]||'').trim();
+      if(!addr || addr==='offline') throw new Error('offline');
+      const info={addr,ts:tsTxt||(new Date()).toISOString()};
+      try{localStorage.setItem(KEY,JSON.stringify(info));}catch(e){}
+      last=info;
+      msg.textContent='连接成功，正在打开…';
+      meta.textContent='最后在线：'+fmt(tsTxt);
+      setTimeout(()=>location.replace(addr),350);
+    }catch(e){
+      sp.classList.add('hidden');
+      err.classList.remove('hidden');
+      const em=document.getElementById('emsg'),eb=document.getElementById('eback');
+      if(last && last.addr){
+        em.textContent='服务暂未上线，但你有上次的连接：';
+        eb.href=last.addr; eb.style.display=''; eb.textContent=last.addr;
+        meta.textContent='上次在线：'+fmt(last.ts);
+      }else{
+        em.textContent='讨论间暂未上线（服务器可能未开机）';
+        meta.textContent='';
+      }
+      // 主动检测：服务器一上线（地址源刷新）就自动连接
+      if(window._retryTimer) clearInterval(window._retryTimer);
+      const tryOnce=async()=>{
+        try{
+          const r2=await fetch(ADDR_FILE+'?v='+Date.now(),{cache:'no-store'});
+          if(!r2.ok) return;
+          const t2=(await r2.text()).trim(); if(!t2) return;
+          const a=(t2.split(/\r?\n/)[0]||'').trim();
+          if(a && a!=='offline'){ clearInterval(window._retryTimer); location.replace(a); }
+        }catch(_){}
+      };
+      window._retryTimer=setInterval(tryOnce,15000);
+      msg.textContent='服务器上线后将自动连接…';
+  }
+  function fmt(s){ try{ if(!s)return ''; const d=new Date(s); if(isNaN(d))return ''; return d.toLocaleString('zh-CN',{hour12:false}); }catch(e){return '';}}
+  boot();
+</script>
+</body>
+</html>
