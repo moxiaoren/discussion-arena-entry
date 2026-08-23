@@ -55,6 +55,8 @@
 <script>
   const ADDR_FILE = 'latest.txt';
   const KEY = 'ta_last';
+  // fetch 带超时，避免网络/边缘缓存异常时永久停在"正在连接"
+  function fetchTO(u, ms = 9000) { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); return fetch(u, { signal: c.signal, cache: 'no-store' }).finally(() => clearTimeout(t)); }
   let last = null;
   try{ last = JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
 
@@ -66,7 +68,7 @@
     sp.classList.remove('hidden'); msg.textContent='正在连接讨论间…'; ub.textContent='';
     const ts=Date.now();
     try{
-      const r=await fetch(ADDR_FILE+'?v='+ts,{cache:'no-store'});
+      const r = await fetchTO(ADDR_FILE + '?v=' + ts);
       if(!r.ok) throw new Error('addr '+r.status);
       const txt=(await r.text()).trim();
       if(!txt) throw new Error('empty');
@@ -96,7 +98,7 @@
       if(window._retryTimer) clearInterval(window._retryTimer);
       const tryOnce=async()=>{
         try{
-          const r2=await fetch(ADDR_FILE+'?v='+Date.now(),{cache:'no-store'});
+          const r2 = await fetchTO(ADDR_FILE + '?v=' + Date.now());
           if(!r2.ok) return;
           const t2=(await r2.text()).trim(); if(!t2) return;
           const a=(t2.split(/\r?\n/)[0]||'').trim();
